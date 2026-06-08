@@ -4,5 +4,10 @@
       "path": "/api/poll-emails",
       "schedule": "* * * * *"
     }
-  ]
+  ],
+  "functions": {
+    "app/api/poll-emails/route.ts": {
+      "maxDuration": 30
+    }
+  }
 }
