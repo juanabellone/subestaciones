@@ -88,6 +88,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  // TEST: return immediately to verify function works
+  return NextResponse.json({ ok: true, test: true, timestamp: new Date().toISOString() })
+
   const supabase = createServiceClient()
   const results = { processed: 0, saved: 0, errors: 0 }
   const startTime = Date.now()
