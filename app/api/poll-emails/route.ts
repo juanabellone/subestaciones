@@ -99,9 +99,17 @@ export async function GET(req: NextRequest) {
         const message = await getMessage(accessToken, messageId)
         const body = extractBody(message)
         const event = parseHikvisionEmail(body)
-        if (!event) { await markAsRead(accessToken, messageId); continue }
+        if (!event || !event.deviceName) { await markAsRead(accessToken, messageId); continue }
 
-        const { data: dvr } = await supabase.from('dvrs').select('id').eq('device_name', event.deviceName).single()
+        console.log('Querying Supabase for device:', event.deviceName)
+        const supabaseTimeout = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Supabase timeout')), 5000)
+        )
+        const { data: dvr } = await Promise.race([
+          supabase.from('dvrs').select('id').eq('device_name', event.deviceName).single(),
+          supabaseTimeout,
+        ]) as any
+        console.log('DVR found:', !!dvr)
         if (!dvr) { await markAsRead(accessToken, messageId); continue }
 
         const { error } = await supabase.from('events').insert({
