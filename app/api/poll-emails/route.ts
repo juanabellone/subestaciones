@@ -1,118 +1,102 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ImapFlow } from 'imapflow'
-import { simpleParser } from 'mailparser'
 import { createServiceClient } from '@/lib/supabase-server'
 import { parseHikvisionEmail } from '@/lib/emailParser'
 
-// Este endpoint es llamado por el cron de Vercel cada minuto.
-// Está protegido con un secret para que nadie más lo llame.
+export const maxDuration = 10
+
+async function getAccessToken(): Promise<string> {
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: process.env.GMAIL_CLIENT_ID!,
+      client_secret: process.env.GMAIL_CLIENT_SECRET!,
+      refresh_token: process.env.GMAIL_REFRESH_TOKEN!,
+      grant_type: 'refresh_token',
+    }),
+  })
+  const data = await res.json()
+  if (!data.access_token) throw new Error('No access token: ' + JSON.stringify(data))
+  return data.access_token
+}
+
+async function getUnreadMessages(accessToken: string): Promise<string[]> {
+  const res = await fetch(
+    'https://gmail.googleapis.com/gmail/v1/users/me/messages?q=is:unread&maxResults=20',
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  )
+  const data = await res.json()
+  return (data.messages || []).map((m: any) => m.id)
+}
+
+async function getMessage(accessToken: string, messageId: string) {
+  const res = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=full`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  )
+  return res.json()
+}
+
+async function markAsRead(accessToken: string, messageId: string) {
+  await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/modify`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ removeLabelIds: ['UNREAD'] }),
+    }
+  )
+}
+
+function extractBody(message: any): string {
+  const parts = message.payload?.parts || []
+  for (const part of parts) {
+    if (part.mimeType === 'text/plain' && part.body?.data) {
+      return Buffer.from(part.body.data, 'base64').toString('utf-8')
+    }
+  }
+  if (message.payload?.body?.data) {
+    return Buffer.from(message.payload.body.data, 'base64').toString('utf-8')
+  }
+  for (const part of parts) {
+    if (part.mimeType === 'text/html' && part.body?.data) {
+      return Buffer.from(part.body.data, 'base64').toString('utf-8').replace(/<[^>]+>/g, ' ')
+    }
+  }
+  return ''
+}
 
 export async function GET(req: NextRequest) {
-  // Verificar secret
   const authHeader = req.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-
   const supabase = createServiceClient()
   const results = { processed: 0, saved: 0, errors: 0 }
-
-  const client = new ImapFlow({
-    host: 'imap.gmail.com',
-    port: 993,
-    secure: true,
-    auth: {
-      user: process.env.GMAIL_USER!,
-      pass: process.env.GMAIL_APP_PASSWORD!,
-    },
-    logger: false,
-  })
-
   try {
-    await client.connect()
-    const lock = await client.getMailboxLock('INBOX')
-
-    try {
-      // Buscar mails no leídos de las últimas 2 horas (por seguridad)
-      const since = new Date(Date.now() - 2 * 60 * 60 * 1000)
-      const messages = client.fetch(
-        { unseen: true, since },
-        { source: true, uid: true, envelope: true }
-      )
-
-      for await (const msg of messages) {
-        results.processed++
-
-        try {
-          // Parsear el mail completo
-          const parsed = await simpleParser(msg.source)
-          const messageId = parsed.messageId || `uid-${msg.uid}`
-          const bodyText = parsed.text || parsed.html?.replace(/<[^>]+>/g, ' ') || ''
-
-          // Parsear el contenido del mail de Hikvision
-          const event = parseHikvisionEmail(bodyText)
-          if (!event) {
-            // Mail que no es de Hikvision, igualarlo como leído y saltar
-            await client.messageFlagsAdd({ uid: msg.uid }, ['\\Seen'], { uid: true })
-            continue
-          }
-
-          // Buscar el DVR en la base de datos por device_name
-          const { data: dvr } = await supabase
-            .from('dvrs')
-            .select('id')
-            .eq('device_name', event.deviceName)
-            .single()
-
-          if (!dvr) {
-            console.warn(`DVR no encontrado en DB: "${event.deviceName}"`)
-            await client.messageFlagsAdd({ uid: msg.uid }, ['\\Seen'], { uid: true })
-            continue
-          }
-
-          // Insertar evento (email_message_id evita duplicados)
-          const { error } = await supabase.from('events').insert({
-            dvr_id: dvr.id,
-            event_type: event.eventType,
-            channel_no: event.channelNo,
-            channel_name: event.channelName,
-            occurred_at: event.eventTime.toISOString(),
-            email_message_id: messageId,
-            raw_body: bodyText.substring(0, 1000),
-          })
-
-          if (error) {
-            if (error.code === '23505') {
-              // Duplicado, ya fue procesado
-            } else {
-              console.error('Error insertando evento:', error)
-              results.errors++
-            }
-          } else {
-            results.saved++
-          }
-
-          // Marcar mail como leído
-          await client.messageFlagsAdd({ uid: msg.uid }, ['\\Seen'], { uid: true })
-
-        } catch (msgError) {
-          console.error('Error procesando mensaje:', msgError)
-          results.errors++
-        }
-      }
-    } finally {
-      lock.release()
+    const accessToken = await getAccessToken()
+    const messageIds = await getUnreadMessages(accessToken)
+    for (const messageId of messageIds) {
+      results.processed++
+      try {
+        const message = await getMessage(accessToken, messageId)
+        const body = extractBody(message)
+        const event = parseHikvisionEmail(body)
+        if (!event) { await markAsRead(accessToken, messageId); continue }
+        const { data: dvr } = await supabase.from('dvrs').select('id').eq('device_name', event.deviceName).single()
+        if (!dvr) { await markAsRead(accessToken, messageId); continue }
+        const { error } = await supabase.from('events').insert({
+          dvr_id: dvr.id, event_type: event.eventType, channel_no: event.channelNo,
+          channel_name: event.channelName, occurred_at: event.eventTime.toISOString(),
+          email_message_id: messageId, raw_body: body.substring(0, 1000),
+        })
+        if (error && error.code !== '23505') results.errors++
+        else results.saved++
+        await markAsRead(accessToken, messageId)
+      } catch (err) { results.errors++ }
     }
-
-    await client.logout()
   } catch (err) {
-    console.error('Error IMAP:', err)
-    return NextResponse.json({ error: 'IMAP error', details: String(err) }, { status: 500 })
+    return NextResponse.json({ error: String(err) }, { status: 500 })
   }
-
-  return NextResponse.json({
-    ok: true,
-    ...results,
-    timestamp: new Date().toISOString(),
-  })
+  return NextResponse.json({ ok: true, ...results, timestamp: new Date().toISOString() })
 }
