@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase-server'
 import { parseHikvisionEmail } from '@/lib/emailParser'
 
-export const maxDuration = 10
+export const maxDuration = 30
 
 async function fetchWithTimeout(url: string, options: RequestInit = {}, ms = 8000) {
   const controller = new AbortController()
@@ -35,7 +35,7 @@ async function getAccessToken(): Promise<string> {
 async function getUnreadMessages(accessToken: string): Promise<string[]> {
   console.log('Fetching unread messages...')
   const res = await fetchWithTimeout(
-    'https://gmail.googleapis.com/gmail/v1/users/me/messages?q=is:unread&maxResults=20',
+    'https://gmail.googleapis.com/gmail/v1/users/me/messages?q=is:unread&maxResults=5',
     { headers: { Authorization: `Bearer ${accessToken}` } }
   )
   const data = await res.json()
