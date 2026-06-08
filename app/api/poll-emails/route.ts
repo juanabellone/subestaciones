@@ -88,9 +88,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // TEST: return immediately to verify function works
-  return NextResponse.json({ ok: true, test: true, timestamp: new Date().toISOString() })
-
   const supabase = createServiceClient()
   const results = { processed: 0, saved: 0, errors: 0 }
   const startTime = Date.now()
@@ -111,7 +108,7 @@ export async function GET(req: NextRequest) {
         const body = extractBody(message)
         const event = parseHikvisionEmail(body)
 
-        if (!event || !event.deviceName) {
+        if (!event?.deviceName) {
           console.log('Skipping unparseable email:', messageId)
           await markAsRead(accessToken, messageId)
           continue
