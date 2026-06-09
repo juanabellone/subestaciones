@@ -1,13 +1,7 @@
 {
-  "crons": [
-    {
-      "path": "/api/poll-emails",
-      "schedule": "*/5 * * * *"
-    }
-  ],
   "functions": {
-    "app/api/poll-emails/route.ts": {
-      "maxDuration": 30
+    "app/api/events/route.ts": {
+      "maxDuration": 10
     }
   }
 }

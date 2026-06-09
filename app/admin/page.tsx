@@ -20,7 +20,7 @@ export default async function AdminPage() {
 
   if (profile?.role !== 'admin') redirect('/dashboard')
 
-  // Todos los eventos recientes (últimas 48h)
+  // Eventos recientes (últimas 48h)
   const since = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
   const { data: events } = await supabase
     .from('events')
@@ -32,13 +32,21 @@ export default async function AdminPage() {
     .order('occurred_at', { ascending: false })
     .limit(100)
 
-  // Subestaciones y DVRs para el panel de gestión
+  // Subestaciones y DVRs
   const { data: substations } = await supabase
     .from('substations')
     .select('id, name, dvrs ( id, name, device_name )')
     .order('name')
 
-  // Stats
+  // Lista plana de DVRs para el formulario
+  const dvrs = (substations ?? []).flatMap(sub =>
+    (sub.dvrs ?? []).map(dvr => ({
+      id: dvr.id,
+      name: dvr.name,
+      substation_name: sub.name,
+    }))
+  )
+
   const totalEvents = events?.length || 0
   const videoLossCount = events?.filter(e => e.event_type.toLowerCase().includes('loss')).length || 0
 
@@ -64,11 +72,10 @@ export default async function AdminPage() {
           </div>
         </div>
 
-        {/* Gestión de subestaciones y DVRs */}
+        {/* Subestaciones y DVRs */}
         <div className="bg-gray-900 rounded-xl border border-gray-800">
           <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
             <h3 className="font-semibold text-white">Subestaciones y DVRs</h3>
-            <AdminActions />
           </div>
           <div className="divide-y divide-gray-800">
             {substations?.map(sub => (
@@ -88,8 +95,9 @@ export default async function AdminPage() {
 
         {/* Feed de eventos */}
         <div className="bg-gray-900 rounded-xl border border-gray-800">
-          <div className="px-6 py-4 border-b border-gray-800">
+          <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
             <h3 className="font-semibold text-white">Eventos recientes (últimas 48h)</h3>
+            <AdminActions dvrs={dvrs} />
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -139,6 +147,7 @@ export default async function AdminPage() {
             </table>
           </div>
         </div>
+
       </main>
     </div>
   )
