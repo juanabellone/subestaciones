@@ -41,10 +41,16 @@ export default async function DashboardPage() {
         </div>
 
         {(!substations || substations.length === 0) ? (
-          <div className="text-center py-20 text-gray-500">No hay subestaciones configuradas</div>
+          <div className="text-center py-20 text-gray-500">Sin eventos en las últimas 24 horas</div>
         ) : (
           <div className="space-y-6">
-            {substations.map(sub => (
+            {substations.filter(sub =>
+              sub.dvrs?.some(dvr =>
+                (dvr.events || []).some(e =>
+                  new Date(e.occurred_at) > new Date(Date.now() - 24 * 60 * 60 * 1000)
+                )
+              )
+            ).map(sub => (
               <div key={sub.id} className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
                 <div className="px-6 py-4 border-b border-gray-800 flex items-center gap-3">
                   <div className="w-2 h-2 rounded-full bg-green-500"></div>
