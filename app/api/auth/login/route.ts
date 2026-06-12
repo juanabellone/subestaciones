@@ -8,12 +8,12 @@ export async function POST(req: NextRequest) {
 
   if (email === process.env.ADMIN_EMAIL && password === process.env.ADMIN_PASSWORD) {
     role = 'admin'
-  } else if (email === process.env.CLIENT_EMAIL && password === process.env.CLIENT_PASSWORD) {
+  } else if (email === process.env.CLIENT_USER && password === process.env.CLIENT_PASSWORD) {
     role = 'client'
   }
 
   if (!role) {
-    return NextResponse.json({ error: 'Email o contraseña incorrectos' }, { status: 401 })
+    return NextResponse.json({ error: 'Usuario o contraseña incorrectos' }, { status: 401 })
   }
 
   const token = await encryptSession(role, email)
