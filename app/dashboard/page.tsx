@@ -24,7 +24,7 @@ export default async function DashboardPage() {
       dvrs (
         id, name, device_name,
         events (
-          id, event_type, channel_name, channel_no, occurred_at
+          id, event_type, channel_name, channel_no, occurred_at, resolved_at
         )
       )
     `)
@@ -77,20 +77,25 @@ export default async function DashboardPage() {
                         ) : (
                           <div className="space-y-2">
                             {recentEvents.map(event => (
-                              <div key={event.id} className="flex items-center gap-3 bg-gray-800/50 rounded-lg px-4 py-2.5">
+                              <div key={event.id} className={`flex items-center gap-3 rounded-lg px-4 py-2.5 ${event.resolved_at ? 'bg-gray-800/20 opacity-50' : 'bg-gray-800/50'}`}>
                                 <EventBadge type={event.event_type} />
                                 <div className="flex-1 min-w-0">
-                                  <span className="text-sm text-gray-200">{event.event_type}</span>
+                                  <span className={`text-sm ${event.resolved_at ? 'text-gray-500 line-through' : 'text-gray-200'}`}>{event.event_type}</span>
                                   {event.channel_name && (
                                     <span className="text-xs text-gray-500 ml-2">— {event.channel_name}</span>
                                   )}
                                 </div>
-                                <span className="text-xs text-gray-500 whitespace-nowrap">
-                                  {new Date(event.occurred_at).toLocaleString('es-AR', {
-                                    day: '2-digit', month: '2-digit',
-                                    hour: '2-digit', minute: '2-digit'
-                                  })}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                  {event.resolved_at && (
+                                    <span className="text-xs text-green-500">✓ Resuelto</span>
+                                  )}
+                                  <span className="text-xs text-gray-500 whitespace-nowrap">
+                                    {new Date(event.occurred_at).toLocaleString('es-AR', {
+                                      day: '2-digit', month: '2-digit',
+                                      hour: '2-digit', minute: '2-digit'
+                                    })}
+                                  </span>
+                                </div>
                               </div>
                             ))}
                           </div>

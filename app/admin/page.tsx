@@ -5,6 +5,7 @@ import { createServiceClient } from '@/lib/supabase-server'
 import Navbar from '@/components/Navbar'
 import EventBadge from '@/components/EventBadge'
 import AdminActions from '@/components/AdminActions'
+import ResolveButton from '@/components/ResolveButton'
 
 export const revalidate = 30
 
@@ -22,7 +23,7 @@ export default async function AdminPage() {
   const { data: events } = await supabase
     .from('events')
     .select(`
-      id, event_type, channel_name, channel_no, occurred_at,
+      id, event_type, channel_name, channel_no, occurred_at, resolved_at, resolved_note,
       dvrs ( name, device_name, substations ( name ) )
     `)
     .gte('occurred_at', since)
@@ -100,16 +101,19 @@ export default async function AdminPage() {
                   <th className="px-6 py-3 text-left">DVR</th>
                   <th className="px-6 py-3 text-left">Evento</th>
                   <th className="px-6 py-3 text-left">Canal</th>
+                  <th className="px-6 py-3 text-left">Estado</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800">
                 {events?.map(event => (
-                  <tr key={event.id} className="hover:bg-gray-800/50 transition-colors">
+                  <tr key={event.id} className={`hover:bg-gray-800/50 transition-colors ${event.resolved_at ? 'opacity-50' : ''}`}>
                     <td className="px-6 py-3 text-gray-400 whitespace-nowrap">
-                      {new Date(event.occurred_at).toLocaleString('es-AR', {
-                        day: '2-digit', month: '2-digit', year: 'numeric',
-                        hour: '2-digit', minute: '2-digit', second: '2-digit'
-                      })}
+                      <span className={event.resolved_at ? 'line-through' : ''}>
+                        {new Date(event.occurred_at).toLocaleString('es-AR', {
+                          day: '2-digit', month: '2-digit', year: 'numeric',
+                          hour: '2-digit', minute: '2-digit', second: '2-digit'
+                        })}
+                      </span>
                     </td>
                     <td className="px-6 py-3 text-gray-300">
                       {(event.dvrs as any)?.substations?.name || '—'}
@@ -120,11 +124,18 @@ export default async function AdminPage() {
                     <td className="px-6 py-3">
                       <div className="flex items-center gap-2">
                         <EventBadge type={event.event_type} />
-                        <span className="text-gray-200">{event.event_type}</span>
+                        <span className={event.resolved_at ? 'text-gray-500 line-through' : 'text-gray-200'}>{event.event_type}</span>
                       </div>
                     </td>
                     <td className="px-6 py-3 text-gray-400">
                       {event.channel_name || event.channel_no || '—'}
+                    </td>
+                    <td className="px-6 py-3">
+                      <ResolveButton
+                        eventId={event.id}
+                        resolvedAt={event.resolved_at ?? null}
+                        resolvedNote={event.resolved_note ?? null}
+                      />
                     </td>
                   </tr>
                 ))}
