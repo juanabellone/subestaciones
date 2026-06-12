@@ -1,23 +1,13 @@
 import { redirect } from 'next/navigation'
-import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { cookies } from 'next/headers'
+import { decryptSession, COOKIE_NAME } from '@/lib/auth'
 
 export default async function Home() {
-  const supabase = await createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const cookieStore = await cookies()
+  const token = cookieStore.get(COOKIE_NAME)?.value
+  const session = token ? await decryptSession(token) : null
 
-  if (!user) {
-    redirect('/login')
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.role === 'admin') {
-    redirect('/admin')
-  } else {
-    redirect('/dashboard')
-  }
+  if (!session) redirect('/login')
+  if (session.role === 'admin') redirect('/admin')
+  redirect('/dashboard')
 }

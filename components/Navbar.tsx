@@ -1,7 +1,6 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase'
 
 interface NavbarProps {
   role: 'admin' | 'client'
@@ -10,10 +9,9 @@ interface NavbarProps {
 
 export default function Navbar({ role, userEmail }: NavbarProps) {
   const router = useRouter()
-  const supabase = createClient()
 
   async function handleLogout() {
-    await supabase.auth.signOut()
+    await fetch('/api/auth/logout', { method: 'POST' })
     router.push('/login')
     router.refresh()
   }

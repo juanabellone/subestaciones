@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -10,29 +9,32 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError('')
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
 
-    if (error) {
+    if (!res.ok) {
       setError('Email o contraseña incorrectos')
       setLoading(false)
       return
     }
 
-    router.push('/')
+    const { role } = await res.json()
+    router.push(role === 'admin' ? '/admin' : '/dashboard')
     router.refresh()
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-950">
       <div className="w-full max-w-md">
-        {/* Logo / Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-red-700 rounded-full mb-4">
             <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -43,7 +45,6 @@ export default function LoginPage() {
           <p className="text-gray-400 mt-1">Panel de monitoreo</p>
         </div>
 
-        {/* Form */}
         <div className="bg-gray-900 rounded-xl p-8 shadow-2xl border border-gray-800">
           <form onSubmit={handleLogin} className="space-y-5">
             <div>

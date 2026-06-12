@@ -1,25 +1,22 @@
 import { redirect } from 'next/navigation'
-import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { cookies } from 'next/headers'
+import { decryptSession, COOKIE_NAME } from '@/lib/auth'
+import { createServiceClient } from '@/lib/supabase-server'
 import Navbar from '@/components/Navbar'
 import EventBadge from '@/components/EventBadge'
 
-export const revalidate = 60 // revalidar cada 60 segundos
+export const revalidate = 60
 
 export default async function DashboardPage() {
-  const supabase = await createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const cookieStore = await cookies()
+  const token = cookieStore.get(COOKIE_NAME)?.value
+  const session = token ? await decryptSession(token) : null
 
-  if (!user) redirect('/login')
+  if (!session) redirect('/login')
+  if (session.role === 'admin') redirect('/admin')
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+  const supabase = createServiceClient()
 
-  if (profile?.role === 'admin') redirect('/admin')
-
-  // Cargar subestaciones con sus DVRs y últimos eventos
   const { data: substations } = await supabase
     .from('substations')
     .select(`
@@ -35,7 +32,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-950">
-      <Navbar role="client" userEmail={user.email!} />
+      <Navbar role="client" userEmail={session.email} />
 
       <main className="max-w-6xl mx-auto px-6 py-8">
         <div className="mb-6">
@@ -49,14 +46,12 @@ export default async function DashboardPage() {
           <div className="space-y-6">
             {substations.map(sub => (
               <div key={sub.id} className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
-                {/* Header subestación */}
                 <div className="px-6 py-4 border-b border-gray-800 flex items-center gap-3">
                   <div className="w-2 h-2 rounded-full bg-green-500"></div>
                   <h3 className="font-semibold text-white">{sub.name}</h3>
                   <span className="text-xs text-gray-500">{sub.dvrs?.length || 0} DVR(s)</span>
                 </div>
 
-                {/* DVRs */}
                 <div className="divide-y divide-gray-800">
                   {sub.dvrs?.map(dvr => {
                     const recentEvents = (dvr.events || [])

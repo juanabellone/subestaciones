@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation'
-import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { cookies } from 'next/headers'
+import { decryptSession, COOKIE_NAME } from '@/lib/auth'
+import { createServiceClient } from '@/lib/supabase-server'
 import Navbar from '@/components/Navbar'
 import EventBadge from '@/components/EventBadge'
 import AdminActions from '@/components/AdminActions'
@@ -7,20 +9,15 @@ import AdminActions from '@/components/AdminActions'
 export const revalidate = 30
 
 export default async function AdminPage() {
-  const supabase = await createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const cookieStore = await cookies()
+  const token = cookieStore.get(COOKIE_NAME)?.value
+  const session = token ? await decryptSession(token) : null
 
-  if (!user) redirect('/login')
+  if (!session) redirect('/login')
+  if (session.role !== 'admin') redirect('/dashboard')
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+  const supabase = createServiceClient()
 
-  if (profile?.role !== 'admin') redirect('/dashboard')
-
-  // Eventos recientes (últimas 48h)
   const since = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
   const { data: events } = await supabase
     .from('events')
@@ -32,13 +29,11 @@ export default async function AdminPage() {
     .order('occurred_at', { ascending: false })
     .limit(100)
 
-  // Subestaciones y DVRs
   const { data: substations } = await supabase
     .from('substations')
     .select('id, name, dvrs ( id, name, device_name )')
     .order('name')
 
-  // Lista plana de DVRs para el formulario
   const dvrs = (substations ?? []).flatMap(sub =>
     (sub.dvrs ?? []).map(dvr => ({
       id: dvr.id,
@@ -52,11 +47,10 @@ export default async function AdminPage() {
 
   return (
     <div className="min-h-screen bg-gray-950">
-      <Navbar role="admin" userEmail={user.email!} />
+      <Navbar role="admin" userEmail={session.email} />
 
       <main className="max-w-7xl mx-auto px-6 py-8 space-y-8">
 
-        {/* Stats */}
         <div className="grid grid-cols-3 gap-4">
           <div className="bg-gray-900 rounded-xl border border-gray-800 p-5">
             <p className="text-sm text-gray-400">Subestaciones</p>
@@ -72,9 +66,8 @@ export default async function AdminPage() {
           </div>
         </div>
 
-        {/* Subestaciones y DVRs */}
         <div className="bg-gray-900 rounded-xl border border-gray-800">
-          <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
+          <div className="px-6 py-4 border-b border-gray-800">
             <h3 className="font-semibold text-white">Subestaciones y DVRs</h3>
           </div>
           <div className="divide-y divide-gray-800">
@@ -93,7 +86,6 @@ export default async function AdminPage() {
           </div>
         </div>
 
-        {/* Feed de eventos */}
         <div className="bg-gray-900 rounded-xl border border-gray-800">
           <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
             <h3 className="font-semibold text-white">Eventos recientes (últimas 48h)</h3>
