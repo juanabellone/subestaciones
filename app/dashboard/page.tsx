@@ -24,7 +24,7 @@ export default async function DashboardPage() {
       dvrs (
         id, name, device_name,
         events (
-          id, event_type, channel_name, channel_no, occurred_at, resolved_at
+          id, event_type, channel_name, channel_no, occurred_at, resolved_at, resolved_note
         )
       )
     `)
@@ -85,9 +85,14 @@ export default async function DashboardPage() {
                                     <span className="text-xs text-gray-500 ml-2">— {event.channel_name}</span>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex flex-col items-end gap-0.5">
                                   {event.resolved_at && (
                                     <span className="text-xs text-green-500">✓ Resuelto</span>
+                                  )}
+                                  {event.resolved_at && event.resolved_note && (
+                                    <span className="text-xs text-gray-500 max-w-[160px] text-right" title={event.resolved_note}>
+                                      {event.resolved_note}
+                                    </span>
                                   )}
                                   <span className="text-xs text-gray-500 whitespace-nowrap">
                                     {new Date(event.occurred_at).toLocaleString('es-AR', {
