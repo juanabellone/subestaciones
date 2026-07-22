@@ -119,8 +119,7 @@ export default async function AdminPage({
           {/* Header con tabs */}
           <div className="px-6 pt-4 border-b border-gray-800 flex items-center justify-between">
             <div className="flex gap-1">
-              
-                href="/admin"
+href="/admin"
                 className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
                   tab === 'pendientes'
                     ? 'text-white border-b-2 border-red-600'
