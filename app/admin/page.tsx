@@ -43,17 +43,20 @@ export default async function AdminPage({
     eventsQuery.gte('resolved_at', since7d).not('resolved_at', 'is', null)
   }
 
-  const { data: events } = await eventsQuery
+  const { data: events, error: eventsError } = await eventsQuery
+  if (eventsError) console.error('[admin] error cargando events:', eventsError.message)
 
-  const { data: substations } = await supabase
+  const { data: substations, error: substationsError } = await supabase
     .from('substations')
     .select('id, name, dvrs ( id, name, device_name )')
     .order('name')
+  if (substationsError) console.error('[admin] error cargando substations:', substationsError.message)
 
   const dvrs = (substations ?? []).flatMap(sub =>
     (sub.dvrs ?? []).map(dvr => ({
       id: dvr.id,
       name: dvr.name,
+      device_name: dvr.device_name,
       substation_name: sub.name,
     }))
   )
@@ -116,7 +119,7 @@ export default async function AdminPage({
           {/* Header con tabs */}
           <div className="px-6 pt-4 border-b border-gray-800 flex items-center justify-between">
             <div className="flex gap-1">
-              <a
+              
                 href="/admin"
                 className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
                   tab === 'pendientes'
@@ -126,7 +129,7 @@ export default async function AdminPage({
               >
                 Pendientes
               </a>
-              <a
+              
                 href="/admin?tab=resueltos"
                 className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
                   tab === 'resueltos'
