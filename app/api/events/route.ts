@@ -11,15 +11,29 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { dvr_id, event_type, channel_no, channel_name, occurred_at } = body
+  const { device_name, event_type, channel_no, channel_name, occurred_at } = body
 
-  if (!dvr_id || !event_type || !occurred_at) {
+  if (!device_name || !event_type || !occurred_at) {
     return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 })
   }
 
   const supabase = createServiceClient()
+
+  const { data: dvr, error: dvrError } = await supabase
+    .from('dvrs')
+    .select('id')
+    .eq('device_name', device_name.trim())
+    .single()
+
+  if (dvrError || !dvr) {
+    return NextResponse.json(
+      { error: `No se encontró un DVR con device_name "${device_name}". Revisá que coincida exactamente (mayúsculas incluidas) con el configurado en Supabase.` },
+      { status: 400 }
+    )
+  }
+
   const { error } = await supabase.from('events').insert({
-    dvr_id,
+    dvr_id: dvr.id,
     event_type,
     channel_no: channel_no || null,
     channel_name: channel_name || null,
