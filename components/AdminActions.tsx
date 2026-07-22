@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 interface Dvr {
   id: string
   name: string
+  device_name: string
   substation_name: string
 }
 
@@ -14,7 +15,7 @@ export default function AdminActions({ dvrs }: { dvrs: Dvr[] }) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({
-    dvr_id: '',
+    device_name: '',
     event_type: '',
     channel_no: '',
     channel_name: '',
@@ -39,7 +40,7 @@ export default function AdminActions({ dvrs }: { dvrs: Dvr[] }) {
       })
       if (!res.ok) throw new Error((await res.json()).error)
       setOpen(false)
-      setForm(f => ({ ...f, dvr_id: '', event_type: '', channel_no: '', channel_name: '' }))
+      setForm(f => ({ ...f, device_name: '', event_type: '', channel_no: '', channel_name: '' }))
       router.refresh()
     } catch (err) {
       alert('Error al guardar: ' + String(err))
@@ -65,19 +66,21 @@ export default function AdminActions({ dvrs }: { dvrs: Dvr[] }) {
 
               <div>
                 <label className="text-xs text-gray-400 block mb-1">DVR</label>
-                <select
+                <input
                   required
-                  value={form.dvr_id}
-                  onChange={e => set('dvr_id', e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm"
-                >
-                  <option value="">Seleccioná un DVR</option>
+                  list="dvr-options"
+                  value={form.device_name}
+                  onChange={e => set('device_name', e.target.value)}
+                  placeholder="ej: DVR54"
+                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm placeholder-gray-600"
+                />
+                <datalist id="dvr-options">
                   {dvrs.map(dvr => (
-                    <option key={dvr.id} value={dvr.id}>
+                    <option key={dvr.id} value={dvr.device_name}>
                       {dvr.substation_name} — {dvr.name}
                     </option>
                   ))}
-                </select>
+                </datalist>
               </div>
 
               <div>
